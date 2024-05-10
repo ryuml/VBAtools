@@ -149,12 +149,16 @@ Sub GetLinksDirAllFiles()
     Dim FileName        As String
     Dim ExcelExt1       As String
     Dim ExcelExt2       As String
+    Dim WordExt1        As String
+    Dim WordExt2        As String
     Dim RowCnt          As Integer
     Dim WriteWS_Name    As String
     
-    ' Excelの拡張子指定
+    ' 拡張子指定
     ExcelExt1 = ".xls"
     ExcelExt2 = ".xlsx"
+    WordExt1 = ".doc"
+    WordExt2 = ".docx"
     ' 書き込みワークシート名設定
     WriteWS_Name = "LinkList"
     
@@ -176,7 +180,7 @@ Sub GetLinksDirAllFiles()
     ' 列名設定
     WriteWS.Cells(RowCnt, 1).Activate
     '// A列：ブック名
-    ActiveCell.Value = "ブック名"
+    ActiveCell.Value = "ファイル名"
     ActiveCell.ColumnWidth = 20
     ActiveCell.Font.Bold = True
     '// B列：シート名
@@ -204,14 +208,14 @@ Sub GetLinksDirAllFiles()
         If .Show = False Then Exit Sub
         FolderPath = .SelectedItems(1) 'フォルダパスを取得
     End With
-    
+
+    ' --- Excel処理1
     FileName = Dir(FolderPath & "\*" & ExcelExt1) '最初のファイル名を取得
-    
     Do While FileName <> ""
-        If (LCase(FileName) Like ("*" & ExcelExt1) _
-            Or LCase(FileName) Like ("*" & ExcelExt2)) Then
-            'ファイルを開く
-            Workbooks.Open FileName:=FolderPath & "\" & FileName
+        FilePath = FolderPath & "\" & FileName
+        If LCase(FileName) Like ("*" & ExcelExt1) Then
+            ' ファイルを開く
+            Workbooks.Open FileName:=FilePath
             
             '開いたファイルのリンクを調べて、書き込みシートへ記録
             'WriteWS.Cells(i, 1) = Workbooks(FileName).ActiveSheet.Cells(1, 1)
@@ -226,6 +230,28 @@ Sub GetLinksDirAllFiles()
         FileName = Dir() '次のファイル名を取得
     Loop
     
+    ' --- Excel処理2
+    FileName = Dir(FolderPath & "\*" & ExcelExt2) '最初のファイル名を取得
+    Do While FileName <> ""
+        FilePath = FolderPath & "\" & FileName
+        If LCase(FileName) Like ("*" & ExcelExt2) Then
+            ' ファイルを開く
+            Workbooks.Open FileName:=FilePath
+            
+            '開いたファイルのリンクを調べて、書き込みシートへ記録
+            'WriteWS.Cells(i, 1) = Workbooks(FileName).ActiveSheet.Cells(1, 1)
+            Call ExcelExtractLinks(WriteWS, Workbooks(FileName), RowCnt)
+            '開いたファイルを閉じる
+            Application.DisplayAlerts = False
+            Workbooks(FileName).Close
+            Application.DisplayAlerts = True
+        End If
+        
+        ' 更新処理
+        FileName = Dir() '次のファイル名を取得
+    Loop
+    
+    'CheckIfWordFileIsOpen (FilePath)
 End Sub
 
 
