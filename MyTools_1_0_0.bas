@@ -198,11 +198,11 @@ Sub GetLinksDirAllFiles()
     ActiveCell.ColumnWidth = 20
     ActiveCell.Font.Bold = True
     '// B列：シート名
-    ActiveCell.Offset(0, 1).Value = "シート名"
+    ActiveCell.Offset(0, 1).Value = "シート名/スライド名"
     ActiveCell.Offset(0, 1).ColumnWidth = 20
     ActiveCell.Offset(0, 1).Font.Bold = True
     '// C列：座標
-    ActiveCell.Offset(0, 2).Value = "座標"
+    ActiveCell.Offset(0, 2).Value = "座標/スライド番号"
     ActiveCell.Offset(0, 2).ColumnWidth = 10
     ActiveCell.Offset(0, 2).Font.Bold = True
     '// D列：種類を出力
