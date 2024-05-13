@@ -140,10 +140,17 @@ End Function
 
 
 
-Sub GetLinksDirAllFiles()
-' 指定のディレクトリ内のOfficeファイル内のリンクを取得
+Sub Run_GetLinksDirAllFiles()
+    Call MessageUserForm.Show(vbModal)
+End Sub
 
-    Dim WriteWS         As Worksheet
+
+
+Sub GetLinksDirAllFiles()
+'// 指定のディレクトリ内のOfficeファイル内のリンクを取得
+
+    Dim objItemWB       As Workbook
+    Dim objWriteWS      As Worksheet
     Dim FolderPath      As String
     Dim FilePath        As String
     Dim FileName        As String
@@ -153,32 +160,39 @@ Sub GetLinksDirAllFiles()
     Dim WordExt2        As String
     Dim RowCnt          As Integer
     Dim WriteWS_Name    As String
+    Dim FileIsOpen      As Boolean
+    Dim MsgText         As String
+    Dim CntOpenFiles    As Integer
     
-    ' 拡張子指定
+    '// --- 初期化
+    MsgText = "処理候補ファイル／処理結果："
+    CntOpenFiles = 0
+    '// 拡張子指定
     ExcelExt1 = ".xls"
     ExcelExt2 = ".xlsx"
     WordExt1 = ".doc"
     WordExt2 = ".docx"
-    ' 書き込みワークシート名設定
+    '// 書き込みワークシート名設定
     WriteWS_Name = "LinkList"
     
     If ExistsSheet(WriteWS_Name) Then
+        '// シートがある場合は内容をクリア
         Worksheets(WriteWS_Name).Activate
         ActiveSheet.Cells.Clear
     Else
         '// ブックの一番左に新規シートを追加
         Call Worksheets.Add(Before:=Worksheets(1))
         'Worksheets(1).Activate
-        ActiveSheet.Name = WriteWS_Name   ' 名前変更
+        ActiveSheet.Name = WriteWS_Name   '// 名前変更
     End If
     
-    'マクロファイルのシートを設定
-    Set WriteWS = ThisWorkbook.ActiveSheet
+    '// マクロファイルのシートを設定
+    Set objWriteWS = ThisWorkbook.ActiveSheet
     
-    ' 行カウント初期化
+    '// 行カウント初期化
     RowCnt = 1
-    ' 列名設定
-    WriteWS.Cells(RowCnt, 1).Activate
+    '// 列名設定
+    objWriteWS.Cells(RowCnt, 1).Activate
     '// A列：ブック名
     ActiveCell.Value = "ファイル名"
     ActiveCell.ColumnWidth = 20
@@ -199,59 +213,77 @@ Sub GetLinksDirAllFiles()
     ActiveCell.Offset(0, 4).Value = "アドレス"
     ActiveCell.Offset(0, 4).ColumnWidth = 20
     ActiveCell.Offset(0, 4).Font.Bold = True
-    ' 行カウント更新
+    '// 行カウント更新
     RowCnt = RowCnt + 1
     
-    'フォルダ選択用ダイアログを表示
+    '// フォルダ選択用ダイアログを表示
     With Application.FileDialog(msoFileDialogFolderPicker)
-        .InitialFileName = ThisWorkbook.Path '現在のフォルダパス
+        .InitialFileName = ThisWorkbook.Path '// 現在のフォルダパス
         If .Show = False Then Exit Sub
-        FolderPath = .SelectedItems(1) 'フォルダパスを取得
+        FolderPath = .SelectedItems(1) '// フォルダパスを取得
     End With
 
-    ' --- Excel処理1
-    FileName = Dir(FolderPath & "\*" & ExcelExt1) '最初のファイル名を取得
+    '// --- Excel処理
+    '// 最初のファイル名を取得(Dir関数は"*.xls"でも"*.xls*"と同様の動作
+    FileName = Dir(FolderPath & "\*" & ExcelExt1)
     Do While FileName <> ""
         FilePath = FolderPath & "\" & FileName
-        If LCase(FileName) Like ("*" & ExcelExt1) Then
-            ' ファイルを開く
-            Workbooks.Open FileName:=FilePath
-            
-            '開いたファイルのリンクを調べて、書き込みシートへ記録
-            'WriteWS.Cells(i, 1) = Workbooks(FileName).ActiveSheet.Cells(1, 1)
-            Call ExcelExtractLinks(WriteWS, Workbooks(FileName), RowCnt)
-            '開いたファイルを閉じる
-            Application.DisplayAlerts = False
-            Workbooks(FileName).Close
-            Application.DisplayAlerts = True
+        
+        '// ファイルが開いているか確認
+        FileIsOpen = False   '// 初期化
+        Set objItemWB = Nothing
+        '// 自身のファイルと同じならフラグ立てる
+        If FileName = ThisWorkbook.Name Then
+            FileIsOpen = True
+        Else
+            '// FileIsOpenフラグ立っていなければ、他のブック一覧を確認
+            For Each objItemWB In Workbooks
+                If FileName = objItemWB.Name Then
+                    FileIsOpen = True
+                    Exit For
+                End If
+            Next
+            '// オブジェクトの解放
+            Set objItemWB = Nothing
         End If
         
-        ' 更新処理
-        FileName = Dir() '次のファイル名を取得
+        If FileIsOpen Then
+            MsgText = MsgText & vbCrLf & FileName & ": " & "既に開いているためスキップしました"
+        End If
+        
+        If Not FileIsOpen _
+            And (LCase(FileName) Like ("*" & ExcelExt1) _
+                Or LCase(FileName) Like ("*" & ExcelExt2)) Then
+            '// フォームに読み込み中ファイル表示
+            CntOpenFiles = CntOpenFiles + 1
+            MsgText = MsgText & vbCrLf & FileName & ": " & "ファイルを読み込みました"
+            
+            '// ファイルを開く
+            Workbooks.Open FileName:=FilePath
+            
+            '// 開いたファイルのリンクを調べて、書き込みシートへ記録
+            Call ExcelExtractLinks(objWriteWS, Workbooks(FileName), RowCnt)
+            '// 開いたファイルを閉じる
+            'Application.DisplayAlerts = False
+            Call Workbooks(FileName).Close(False)
+            'Application.DisplayAlerts = True
+        End If
+        
+        '// 更新処理
+        FileName = Dir() '// 次のファイル名を取得
     Loop
     
-    ' --- Excel処理2
-    FileName = Dir(FolderPath & "\*" & ExcelExt2) '最初のファイル名を取得
-    Do While FileName <> ""
-        FilePath = FolderPath & "\" & FileName
-        If LCase(FileName) Like ("*" & ExcelExt2) Then
-            ' ファイルを開く
-            Workbooks.Open FileName:=FilePath
-            
-            '開いたファイルのリンクを調べて、書き込みシートへ記録
-            'WriteWS.Cells(i, 1) = Workbooks(FileName).ActiveSheet.Cells(1, 1)
-            Call ExcelExtractLinks(WriteWS, Workbooks(FileName), RowCnt)
-            '開いたファイルを閉じる
-            Application.DisplayAlerts = False
-            Workbooks(FileName).Close
-            Application.DisplayAlerts = True
-        End If
-        
-        ' 更新処理
-        FileName = Dir() '次のファイル名を取得
-    Loop
+    '// Excelシートオブジェクトの解放
+    Set objWriteWS = Nothing
     
     'CheckIfWordFileIsOpen (FilePath)
+    
+    '// 終了処理
+    If CntOpenFiles > 0 Then
+        MsgText = MsgText & vbCrLf & vbCrLf & ">> ファイル読み込み数： " & CntOpenFiles
+    End If
+    MessageUserForm.MsgTextBox.Text = MsgText
+    
 End Sub
 
 
@@ -307,17 +339,23 @@ Sub ExcelExtractLinks(ByRef w_ws As Worksheet, ByRef r_wb As Workbook, _
         
 On Error GoTo SkipNoFormula
         '// 範囲取得
+        Set CellDataRange = Nothing   '// 初期化
         '// 何かしら書式・データが入っている範囲を取得
         Set TmpUR = sht.UsedRange
         If Not TmpUR Is Nothing Then
-            If IsEmpty(TmpUR) Then
-                '// セル内容が空白（データが空 or 空文字列）しか無い場合はエラー回避のため数式判定せず、処理もしない設定
-                Set CellDataRange = Nothing
-            Else
-                '// CellDataRange に範囲（オブジェクト参照）がある場合、数式があるセル範囲を取得
-                Set CellDataRange = TmpUR.SpecialCells(xlCellTypeFormulas)
-            End If
+            For Each CellData In TmpUR
+                If IsEmpty(CellData) Then
+                    '// セル内容が空白（データが空 or 空文字列）しか無い場合はエラー回避のため数式判定せず、処理もしない設定
+                    Set CellDataRange = Nothing
+                Else
+                    '// CellData のセル内容が空白（データが空 or 空文字列）でない場合、数式があるセル範囲を取得
+                    Set CellDataRange = TmpUR.SpecialCells(xlCellTypeFormulas)
+                End If
+            Next
         End If
+        '// オブジェクト解放
+        Set TmpUR = Nothing
+On Error GoTo 0
         
         '// HYPERLINKの値取得
         If Not CellDataRange Is Nothing Then
@@ -338,9 +376,12 @@ On Error GoTo SkipNoFormula
                 End If
             Next
         End If
+        
 SkipNoFormula:
         '// 数式セルが無かった場合スキップ
-        Err.Clear
+        If Err.Number <> 0 Then
+            Err.Clear
+        End If
     Next
     
     '// 配列(0)に格納済みの場合(ar(0)が空文字ではない)
