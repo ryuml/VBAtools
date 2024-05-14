@@ -151,6 +151,7 @@ Sub GetLinksDirAllFiles()
 
     Dim objItemWB       As Workbook
     Dim objWriteWS      As Worksheet
+    Dim ppApp           As Object   '// PowerPointオブジェクト
     Dim FolderPath      As String
     Dim FilePath        As String
     Dim FileName        As String
@@ -158,6 +159,8 @@ Sub GetLinksDirAllFiles()
     Dim ExcelExt2       As String
     Dim WordExt1        As String
     Dim WordExt2        As String
+    Dim PwPtExt1        As String
+    Dim PwPtExt2        As String
     Dim RowCnt          As Integer
     Dim WriteWS_Name    As String
     Dim FileIsOpen      As Boolean
@@ -172,6 +175,8 @@ Sub GetLinksDirAllFiles()
     ExcelExt2 = ".xlsx"
     WordExt1 = ".doc"
     WordExt2 = ".docx"
+    PwPtExt1 = ".ppt"
+    PwPtExt2 = ".pptx"
     '// 書き込みワークシート名設定
     WriteWS_Name = "LinkList"
     
@@ -202,7 +207,7 @@ Sub GetLinksDirAllFiles()
     ActiveCell.Offset(0, 1).ColumnWidth = 20
     ActiveCell.Offset(0, 1).Font.Bold = True
     '// C列：座標
-    ActiveCell.Offset(0, 2).Value = "座標/スライド番号"
+    ActiveCell.Offset(0, 2).Value = "座標/スライド番号/ページ"
     ActiveCell.Offset(0, 2).ColumnWidth = 10
     ActiveCell.Offset(0, 2).Font.Bold = True
     '// D列：種類を出力
@@ -273,10 +278,62 @@ Sub GetLinksDirAllFiles()
         FileName = Dir() '// 次のファイル名を取得
     Loop
     
+    'CheckIfWordFileIsOpen (FilePath)
+    
+    
+    '// --- PowerPoint処理
+    '// 最初のファイル名を取得(Dir関数は"*.ppt"でも"*.ppt*"と同様の動作
+    FileName = Dir(FolderPath & "\*" & PwPtExt1)
+    Do While FileName <> ""
+        FilePath = FolderPath & "\" & FileName
+        
+        '// ファイルが開いているか確認
+        FileIsOpen = False   '// 初期化
+        FileIsOpen = CheckIfPwPtFileIsOpen(FilePath)
+        
+        If FileIsOpen Then
+            MsgText = MsgText & vbCrLf & FileName & ": " & "既に開いているためスキップしました"
+        End If
+        
+        If Not FileIsOpen _
+            And (LCase(FileName) Like ("*" & PwPtExt1) _
+                Or LCase(FileName) Like ("*" & PwPtExt2)) Then
+            '// フォームに読み込み中ファイル表示
+            CntOpenFiles = CntOpenFiles + 1
+            MsgText = MsgText & vbCrLf & FileName & ": " & "ファイルを読み込みました"
+            
+            '// ファイルを開く
+            'Workbooks.Open FileName:=FilePath
+            '// エラーが発生してもスクリプトの実行を続行
+On Error Resume Next
+            '// 既存のPowerPointアプリケーションがあるか確認
+            Set ppApp = GetObject(, "PowerPoint.Application")
+            '// エラーハンドリングを元に戻す
+On Error GoTo 0
+            '// PowerPointアプリケーションが存在する場合
+            If Not ppApp Is Nothing Then
+                '// 指定されたパスのファイルを開く
+                Call ppApp.Presentations.Open(FileName:=FilePath)
+            End If
+            
+            '// 開いたファイルのリンクを調べて、書き込みシートへ記録
+            Call GetPpAppHlinks(objWriteWS, ppApp.Presentations(FileName), RowCnt)
+            '// 開いたファイルを閉じる
+            'Application.DisplayAlerts = False
+            Call ppApp.Presentations(FileName).Close
+            'Application.DisplayAlerts = True
+            
+            '// 使用後のオブジェクトを解放
+            Set ppApp = Nothing
+        End If
+        
+        '// 更新処理
+        FileName = Dir() '// 次のファイル名を取得
+    Loop
+    
+    
     '// Excelシートオブジェクトの解放
     Set objWriteWS = Nothing
-    
-    'CheckIfWordFileIsOpen (FilePath)
     
     '// 終了処理
     If CntOpenFiles > 0 Then
